@@ -20,6 +20,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.OvalShape;
 import android.os.Build;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -32,10 +33,15 @@ import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.keyboard.Keyboard;
@@ -109,12 +115,23 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     private final StripVisibilityGroup mStripVisibilityGroup;
     private boolean isExternalSuggestionVisible = false; // Required to disable the more suggestions if other suggestions are visible
 
+    private final Drawable mSearchIcon;
+    private final Drawable mCloseIcon;
+    private ImageButton mSearchEntryView;
+    private EditText mSearchEditor;
+    private View mSearchView;
+    private InputConnection mInputConnection;
+
+    public EditText getSearchEditor() {
+        return mSearchEditor;
+    }
+
     private static class StripVisibilityGroup {
         private final View mSuggestionStripView;
         private final View mSuggestionsStrip;
 
         public StripVisibilityGroup(final View suggestionStripView,
-                final ViewGroup suggestionsStrip) {
+                                    final ViewGroup suggestionsStrip) {
             mSuggestionStripView = suggestionStripView;
             mSuggestionsStrip = suggestionsStrip;
             showSuggestionsStrip();
@@ -183,6 +200,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
         final KeyboardIconsSet iconsSet = KeyboardIconsSet.Companion.getInstance();
         mIncognitoIcon = iconsSet.getNewDrawable(ToolbarKey.INCOGNITO.name(), context);
+        mSearchIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_SEARCH_KEY, context);
+        mCloseIcon = iconsSet.getNewDrawable(ToolbarKey.CLOSE_HISTORY.name(), context);
         mToolbarArrowIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context);
         mBinIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_BIN, context);
 
@@ -225,6 +244,14 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         }
 
         colors.setBackground(this, ColorType.STRIP_BACKGROUND);
+
+        initSearchEditorView(colors);
+    }
+
+    private EditorInfo searchEditorInfo;
+
+    public EditorInfo getSearchEditorInfo() {
+        return searchEditorInfo;
     }
 
     /**
@@ -233,6 +260,63 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     public void setListener(final Listener listener, final View inputView) {
         mListener = listener;
         mMainKeyboardView = inputView.findViewById(R.id.keyboard_view);
+    }
+
+    public InputConnection getInputConnection() {
+        return mInputConnection;
+    }
+
+    public void hideSearchView() {
+        if (mSearchEditor != null) {
+            mSearchEditor.setText("");
+            mSearchEditor.clearFocus();
+        }
+        if (mSearchView != null) {
+            mSearchView.setVisibility(View.GONE);
+        }
+    }
+
+    private void initSearchEditorView(Colors colors) {
+        mSearchView = findViewById(R.id.search_view);
+        mSearchEditor = findViewById(R.id.search_editor);
+        mSearchEntryView = findViewById(R.id.search_toolbar_key);
+        if (mSearchEntryView != null) {
+            mSearchEntryView.setImageDrawable(mSearchIcon);
+            colors.setColor(mSearchEntryView, ColorType.TOOL_BAR_EXPAND_KEY);
+            mSearchEntryView.getBackground().setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
+            mSearchEntryView.setOnClickListener(v -> {
+                if (mSearchView.getVisibility() != View.VISIBLE) {
+                    mSearchView.setVisibility(View.VISIBLE);
+                    EditorInfo editorInfo = new EditorInfo();
+                    editorInfo.imeOptions = EditorInfo.IME_ACTION_SEARCH;
+                    editorInfo.inputType = InputType.TYPE_CLASS_TEXT;
+                    editorInfo.fieldId = mSearchEditor.getId();
+                    searchEditorInfo = editorInfo;
+                    mInputConnection = mSearchEditor.onCreateInputConnection(editorInfo);
+                    mSearchEditor.requestFocus();
+                }
+            });
+        }
+        ImageButton searchClose = findViewById(R.id.search_close);
+        if (searchClose != null) {
+            searchClose.setImageDrawable(mCloseIcon);
+            colors.setColor(searchClose, ColorType.TOOL_BAR_EXPAND_KEY);
+            searchClose.getBackground().setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
+            searchClose.setOnClickListener(v -> {
+                hideSearchView();
+            });
+        }
+        if (mSearchEditor != null) {
+            mSearchEditor.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    if (!TextUtils.isEmpty(v.getEditableText().toString())) {
+                        Toast.makeText(mSearchEditor.getContext(), "search click", Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
+                }
+                return false;
+            });
+        }
     }
 
     private void updateKeys() {
@@ -334,21 +418,21 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
     private final PopupKeysPanel.Controller mMoreSuggestionsController =
             new PopupKeysPanel.Controller() {
-        @Override
-        public void onDismissPopupKeysPanel() {
-            mMainKeyboardView.onDismissPopupKeysPanel();
-        }
+                @Override
+                public void onDismissPopupKeysPanel() {
+                    mMainKeyboardView.onDismissPopupKeysPanel();
+                }
 
-        @Override
-        public void onShowPopupKeysPanel(final PopupKeysPanel panel) {
-            mMainKeyboardView.onShowPopupKeysPanel(panel);
-        }
+                @Override
+                public void onShowPopupKeysPanel(final PopupKeysPanel panel) {
+                    mMainKeyboardView.onShowPopupKeysPanel(panel);
+                }
 
-        @Override
-        public void onCancelPopupKeysPanel() {
-            dismissMoreSuggestionsPanel();
-        }
-    };
+                @Override
+                public void onCancelPopupKeysPanel() {
+                    dismissMoreSuggestionsPanel();
+                }
+            };
 
     public boolean isShowingMoreSuggestionPanel() {
         return mMoreSuggestionsView.isShowingInParent();
@@ -528,16 +612,16 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     private final GestureDetector mMoreSuggestionsSlidingDetector;
     private final GestureDetector.OnGestureListener mMoreSuggestionsSlidingListener =
             new GestureDetector.SimpleOnGestureListener() {
-        @Override
-        public boolean onScroll(@Nullable MotionEvent down, @NonNull MotionEvent me, float deltaX, float deltaY) {
-            if (down == null) return false;
-            final float dy = me.getY() - down.getY();
-            if (mToolbarContainer.getVisibility() != VISIBLE && deltaY > 0 && dy < 0) {
-                return showMoreSuggestions();
-            }
-            return false;
-        }
-    };
+                @Override
+                public boolean onScroll(@Nullable MotionEvent down, @NonNull MotionEvent me, float deltaX, float deltaY) {
+                    if (down == null) return false;
+                    final float dy = me.getY() - down.getY();
+                    if (mToolbarContainer.getVisibility() != VISIBLE && deltaY > 0 && dy < 0) {
+                        return showMoreSuggestions();
+                    }
+                    return false;
+                }
+            };
 
     @Override
     public boolean onInterceptTouchEvent(final MotionEvent me) {

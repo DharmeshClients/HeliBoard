@@ -37,8 +37,10 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InlineSuggestion;
 import android.view.inputmethod.InlineSuggestionsRequest;
 import android.view.inputmethod.InlineSuggestionsResponse;
+import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodSubtype;
+import android.widget.EditText;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.compat.ConfigurationCompatKt;
@@ -160,6 +162,13 @@ public class LatinIME extends InputMethodService implements
 
     private final BroadcastReceiver mDictionaryDumpBroadcastReceiver =
             new DictionaryDumpBroadcastReceiver(this);
+
+    private EditText mSearchEditor;
+
+    @Override
+    public InputConnection getCurrentInputConnection() {
+        return (mSuggestionStripView != null && mSearchEditor != null && mSearchEditor.isFocused()) ? mSuggestionStripView.getInputConnection(): super.getCurrentInputConnection();
+    }
 
     final static class RestartAfterDeviceUnlockReceiver extends BroadcastReceiver {
         @Override
@@ -817,9 +826,32 @@ public class LatinIME extends InputMethodService implements
         mInsetsUpdater = ViewOutlineProviderUtilsKt.setInsetsOutlineProvider(view);
         updateSoftInputWindowLayoutParameters();
         mSuggestionStripView = view.findViewById(R.id.suggestion_strip_view);
+        initSearchEditorFocusChange();
         if (hasSuggestionStripView()) {
             mSuggestionStripView.setListener(this, view);
         }
+    }
+
+    private void initSearchEditorFocusChange() {
+        if (mSuggestionStripView != null) {
+            mSearchEditor = mSuggestionStripView.getSearchEditor();
+            if (mSearchEditor != null) {
+                mSearchEditor.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (!hasFocus) {
+                        mInputLogic.finishInput();
+                    }
+                    loadKeyboard();
+                });
+            }
+        }
+    }
+
+    @Override
+    public EditorInfo getCurrentInputEditorInfo() {
+        if (mSearchEditor != null && mSearchEditor.isFocused() && mSuggestionStripView != null) {
+            return mSuggestionStripView.getSearchEditorInfo();
+        }
+        return super.getCurrentInputEditorInfo();
     }
 
     @Override
@@ -844,6 +876,9 @@ public class LatinIME extends InputMethodService implements
         mHandler.onFinishInputView(finishingInput);
         mStatsUtilsManager.onFinishInputView();
         mGestureConsumer = GestureConsumer.NULL_GESTURE_CONSUMER;
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.hideSearchView();
+        }
     }
 
     @Override
@@ -1758,14 +1793,14 @@ public class LatinIME extends InputMethodService implements
         if (repeatCount > 0) {
             // No need to feedback when repeat delete/cursor keys will have no effect.
             switch (code) {
-            case KeyCode.DELETE, KeyCode.ARROW_LEFT, KeyCode.ARROW_UP, KeyCode.WORD_LEFT, KeyCode.PAGE_UP:
-                if (!mInputLogic.mConnection.canDeleteCharacters())
-                    return;
-                break;
-            case KeyCode.ARROW_RIGHT, KeyCode.ARROW_DOWN, KeyCode.WORD_RIGHT, KeyCode.PAGE_DOWN:
-                if (mInputLogic.mConnection.noTextAfterCursor())
-                    return;
-                break;
+                case KeyCode.DELETE, KeyCode.ARROW_LEFT, KeyCode.ARROW_UP, KeyCode.WORD_LEFT, KeyCode.PAGE_UP:
+                    if (!mInputLogic.mConnection.canDeleteCharacters())
+                        return;
+                    break;
+                case KeyCode.ARROW_RIGHT, KeyCode.ARROW_DOWN, KeyCode.WORD_RIGHT, KeyCode.PAGE_DOWN:
+                    if (mInputLogic.mConnection.noTextAfterCursor())
+                        return;
+                    break;
             }
             // TODO: Use event time that the last feedback has been generated instead of relying on
             // a repeat count to thin out feedback.
@@ -1808,7 +1843,7 @@ public class LatinIME extends InputMethodService implements
                     ? mRichImm.getCurrentSubtype()
                     : mKeyboardSwitcher.getKeyboard().mId.mSubtype;
             event = HangulEventDecoder.decodeHardwareKeyEvent(subtype, keyEvent,
-                        () -> getHardwareKeyEventDecoder(keyEvent.getDeviceId()).decodeHardwareKey(keyEvent));
+                    () -> getHardwareKeyEventDecoder(keyEvent.getDeviceId()).decodeHardwareKey(keyEvent));
         } else {
             event = getHardwareKeyEventDecoder(keyEvent.getDeviceId()).decodeHardwareKey(keyEvent);
         }

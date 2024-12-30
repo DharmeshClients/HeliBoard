@@ -8,58 +8,105 @@
 <merge
     xmlns:android="http://schemas.android.com/apk/res/android">
     <LinearLayout
-        android:animateLayoutChanges="true"
-        android:id="@+id/suggestions_strip_wrapper"
-        android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:hapticFeedbackEnabled="false"
-        android:soundEffectsEnabled="false">
-        <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
-             We just need to ignore the system's audio and haptic feedback settings. -->
-        <ImageButton
-            android:id="@+id/suggestions_strip_toolbar_key"
-            android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
-            android:layout_height="@dimen/config_suggestions_strip_edge_key_width"
-            android:layout_gravity="center_vertical"
-            android:layout_weight="0"
-            android:layout_marginStart="4dp"
-            style="?attr/suggestionWordStyle"
-            android:contentDescription="@string/more_keys_strip_description" />
-        <HorizontalScrollView
-            android:id="@+id/toolbar_container"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RelativeLayout
+            android:id="@+id/search_view"
+            android:layout_marginVertical="8dp"
+            android:layout_marginHorizontal="16dp"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <EditText
+                android:id="@+id/search_editor"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:hint="@string/label_search_key"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="4dp"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:layout_marginEnd="16dp"
+                android:layout_toStartOf="@id/search_close"
+                android:layout_alignParentStart="true"
+                android:background="@drawable/search_editor_background" />
+
+            <ImageButton
+                android:id="@+id/search_close"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_centerVertical="true"
+                android:layout_alignParentEnd="true"
+                android:scaleType="centerCrop"
+                android:background="#00000000"/>
+        </RelativeLayout>
+
+        <LinearLayout
+            android:animateLayoutChanges="true"
+            android:id="@+id/suggestions_strip_wrapper"
+            android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scrollbarThumbHorizontal="@color/toolbar_scrollbar"
-            android:visibility="gone">
+            android:hapticFeedbackEnabled="false"
+            android:soundEffectsEnabled="false">
+            <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
+                 We just need to ignore the system's audio and haptic feedback settings. -->
+            <ImageButton
+                android:id="@+id/search_toolbar_key"
+                android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
+                android:layout_height="@dimen/config_suggestions_strip_edge_key_width"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="0"
+                android:layout_marginStart="4dp"
+                android:scaleType="centerInside"
+                android:background="#00000000" />
+            <ImageButton
+                android:id="@+id/suggestions_strip_toolbar_key"
+                android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
+                android:layout_height="@dimen/config_suggestions_strip_edge_key_width"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="0"
+                android:layout_marginStart="4dp"
+                style="?attr/suggestionWordStyle"
+                android:contentDescription="@string/more_keys_strip_description" />
+            <HorizontalScrollView
+                android:id="@+id/toolbar_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbarThumbHorizontal="@color/toolbar_scrollbar"
+                android:visibility="gone">
+                <LinearLayout
+                    android:id="@+id/toolbar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    style="?attr/suggestionWordStyle">
+                </LinearLayout>
+            </HorizontalScrollView>
+            <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
+                 We just need to ignore the system's audio and haptic feedback settings. -->
+            <!-- todo: sth is fishy with that maxwidth
+                   check what is going on in the layout helper? -->
             <LinearLayout
-                android:id="@+id/toolbar"
+                android:id="@+id/suggestions_strip"
+                android:orientation="horizontal"
+                android:maxWidth="100dp"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:hapticFeedbackEnabled="false"
+                android:soundEffectsEnabled="false" />
+            <LinearLayout
+                android:id="@+id/pinned_keys"
                 android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
                 style="?attr/suggestionWordStyle">
             </LinearLayout>
-        </HorizontalScrollView>
-        <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
-             We just need to ignore the system's audio and haptic feedback settings. -->
-        <!-- todo: sth is fishy with that maxwidth
-               check what is going on in the layout helper? -->
-        <LinearLayout
-            android:id="@+id/suggestions_strip"
-            android:orientation="horizontal"
-            android:maxWidth="100dp"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center_horizontal"
-            android:hapticFeedbackEnabled="false"
-            android:soundEffectsEnabled="false" />
-        <LinearLayout
-            android:id="@+id/pinned_keys"
-            android:orientation="horizontal"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            style="?attr/suggestionWordStyle">
         </LinearLayout>
     </LinearLayout>
 </merge>
