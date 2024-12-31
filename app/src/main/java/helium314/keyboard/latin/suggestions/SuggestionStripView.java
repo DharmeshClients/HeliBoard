@@ -20,8 +20,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.OvalShape;
 import android.os.Build;
+import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.GestureDetector;
@@ -41,7 +43,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.keyboard.Keyboard;
@@ -64,7 +65,6 @@ import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.suggestions.PopupSuggestionsView.MoreSuggestionsListener;
 import helium314.keyboard.latin.utils.DeviceProtectedUtils;
-import helium314.keyboard.latin.utils.Log;
 import helium314.keyboard.latin.utils.ToolbarKey;
 import helium314.keyboard.latin.utils.ToolbarUtilsKt;
 
@@ -73,6 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.RecyclerView;
 
 public final class SuggestionStripView extends RelativeLayout implements OnClickListener,
         OnLongClickListener {
@@ -115,12 +116,12 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     private final StripVisibilityGroup mStripVisibilityGroup;
     private boolean isExternalSuggestionVisible = false; // Required to disable the more suggestions if other suggestions are visible
 
-    private final Drawable mSearchIcon;
-    private final Drawable mCloseIcon;
-    private ImageButton mSearchEntryView;
+    private ImageView mSearchEntryView;
     private EditText mSearchEditor;
     private View mSearchView;
     private InputConnection mInputConnection;
+    private TextWatcher textWatcher;
+    private RecyclerView mGifRecyclerView;
 
     public EditText getSearchEditor() {
         return mSearchEditor;
@@ -200,8 +201,6 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
         final KeyboardIconsSet iconsSet = KeyboardIconsSet.Companion.getInstance();
         mIncognitoIcon = iconsSet.getNewDrawable(ToolbarKey.INCOGNITO.name(), context);
-        mSearchIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_SEARCH_KEY, context);
-        mCloseIcon = iconsSet.getNewDrawable(ToolbarKey.CLOSE_HISTORY.name(), context);
         mToolbarArrowIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context);
         mBinIcon = iconsSet.getNewDrawable(KeyboardIconsSet.NAME_BIN, context);
 
@@ -244,8 +243,6 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         }
 
         colors.setBackground(this, ColorType.STRIP_BACKGROUND);
-
-        initSearchEditorView(colors);
     }
 
     private EditorInfo searchEditorInfo;
@@ -254,12 +251,18 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         return searchEditorInfo;
     }
 
+    private View mInputView;
+
     /**
      * A connection back to the input method.
      */
     public void setListener(final Listener listener, final View inputView) {
         mListener = listener;
         mMainKeyboardView = inputView.findViewById(R.id.keyboard_view);
+        mInputView = inputView;
+
+        final Colors colors = Settings.getInstance().getCurrent().mColors;
+        initSearchEditorView(colors);
     }
 
     public InputConnection getInputConnection() {
@@ -274,43 +277,81 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         if (mSearchView != null) {
             mSearchView.setVisibility(View.GONE);
         }
+        if (mGifRecyclerView != null) {
+            mGifRecyclerView.setVisibility(View.GONE);
+        }
+        if (mMainKeyboardView != null) {
+            mMainKeyboardView.setPadding(0, 0, 0, 0);
+            mMainKeyboardView.setVisibility(View.VISIBLE);
+        }
     }
 
     private void initSearchEditorView(Colors colors) {
-        mSearchView = findViewById(R.id.search_view);
-        mSearchEditor = findViewById(R.id.search_editor);
-        mSearchEntryView = findViewById(R.id.search_toolbar_key);
+        mSearchView = mInputView.findViewById(R.id.search_view);
+        mSearchEditor = mInputView.findViewById(R.id.search_editor);
+        mSearchEntryView = mInputView.findViewById(R.id.search_toolbar_key);
+        mGifRecyclerView = mInputView.findViewById(R.id.gif_recycler_view);
         if (mSearchEntryView != null) {
-            mSearchEntryView.setImageDrawable(mSearchIcon);
-            colors.setColor(mSearchEntryView, ColorType.TOOL_BAR_EXPAND_KEY);
-            mSearchEntryView.getBackground().setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
+            mSearchEntryView.setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
             mSearchEntryView.setOnClickListener(v -> {
+                int searchViewHeight = ((MarginLayoutParams) mGifRecyclerView.getLayoutParams()).topMargin;
+                boolean isNeedAdjustPadding = mSearchView.getVisibility() != View.VISIBLE;
+                mMainKeyboardView.setPadding(0, isNeedAdjustPadding ? searchViewHeight : 0, 0, 0);
                 if (mSearchView.getVisibility() != View.VISIBLE) {
                     mSearchView.setVisibility(View.VISIBLE);
+                    mGifRecyclerView.getLayoutParams().height = mMainKeyboardView.getHeight();
                     EditorInfo editorInfo = new EditorInfo();
-                    editorInfo.imeOptions = EditorInfo.IME_ACTION_SEARCH;
+                    editorInfo.imeOptions = EditorInfo.IME_ACTION_DONE;
                     editorInfo.inputType = InputType.TYPE_CLASS_TEXT;
                     editorInfo.fieldId = mSearchEditor.getId();
                     searchEditorInfo = editorInfo;
                     mInputConnection = mSearchEditor.onCreateInputConnection(editorInfo);
-                    mSearchEditor.requestFocus();
+                    mMainKeyboardView.setVisibility(View.INVISIBLE);
+                } else {
+                    hideSearchView();
                 }
             });
         }
-        ImageButton searchClose = findViewById(R.id.search_close);
-        if (searchClose != null) {
-            searchClose.setImageDrawable(mCloseIcon);
-            colors.setColor(searchClose, ColorType.TOOL_BAR_EXPAND_KEY);
-            searchClose.getBackground().setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
-            searchClose.setOnClickListener(v -> {
-                hideSearchView();
+        ImageView clear = mInputView.findViewById(R.id.search_editor_clear);
+        clear.setOnClickListener(v -> {
+            mSearchEditor.setText("");
+            mSearchEditor.clearFocus();
+            clear.setVisibility(View.GONE);
+        });
+        mSearchEditor.addTextChangedListener(textWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                clear.setVisibility(TextUtils.isEmpty(s.toString()) ? View.GONE : View.VISIBLE);
+            }
+        });
+        ImageView searchEnter = mInputView.findViewById(R.id.search_close);
+        if (searchEnter != null) {
+            searchEnter.setColorFilter(colors.get(ColorType.TOOL_BAR_EXPAND_KEY), PorterDuff.Mode.SRC_ATOP);
+            searchEnter.setOnClickListener(v -> {
+                // TODO : show gif search Loading
+                mSearchEditor.clearFocus();
+                mMainKeyboardView.setVisibility(View.INVISIBLE);
+                mGifRecyclerView.setVisibility(View.VISIBLE);
             });
         }
         if (mSearchEditor != null) {
+            mSearchEditor.setSingleLine(true);
             mSearchEditor.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
                     if (!TextUtils.isEmpty(v.getEditableText().toString())) {
-                        Toast.makeText(mSearchEditor.getContext(), "search click", Toast.LENGTH_SHORT).show();
+                        mSearchEditor.clearFocus();
+                        mMainKeyboardView.setVisibility(View.INVISIBLE);
+                        mGifRecyclerView.setVisibility(View.VISIBLE);
                     }
                     return true;
                 }
@@ -725,7 +766,6 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         if (tag instanceof ToolbarKey) {
             final int code = getCodeForToolbarKey((ToolbarKey) tag);
             if (code != KeyCode.UNSPECIFIED) {
-                Log.d(TAG, "click toolbar key "+tag);
                 mListener.onCodeInput(code, Constants.SUGGESTION_STRIP_COORDINATE, Constants.SUGGESTION_STRIP_COORDINATE, false);
                 if (tag == ToolbarKey.INCOGNITO || tag == ToolbarKey.AUTOCORRECT || tag == ToolbarKey.ONE_HANDED) {
                     if (tag == ToolbarKey.INCOGNITO)
@@ -757,6 +797,9 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         dismissMoreSuggestionsPanel();
+        if (mSearchEditor != null && textWatcher != null) {
+            mSearchEditor.removeTextChangedListener(textWatcher);
+        }
     }
 
     @Override

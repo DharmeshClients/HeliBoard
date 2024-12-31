@@ -826,10 +826,10 @@ public class LatinIME extends InputMethodService implements
         mInsetsUpdater = ViewOutlineProviderUtilsKt.setInsetsOutlineProvider(view);
         updateSoftInputWindowLayoutParameters();
         mSuggestionStripView = view.findViewById(R.id.suggestion_strip_view);
-        initSearchEditorFocusChange();
         if (hasSuggestionStripView()) {
             mSuggestionStripView.setListener(this, view);
         }
+        initSearchEditorFocusChange();
     }
 
     private void initSearchEditorFocusChange() {
